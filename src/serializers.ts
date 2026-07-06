@@ -1,4 +1,4 @@
-import type { Document, Shipment, ValidationIssue, ValidationRun, AuditLog } from '@prisma/client';
+import type { Document, Shipment, ValidationRun, AuditLog } from '@prisma/client';
 import type { IngestResult } from './services/documentService.js';
 
 /** Format a Date as a date-only string (arrival dates are day-granular). */
@@ -67,8 +67,18 @@ export function toIngestResponse(result: IngestResult): Record<string, unknown> 
   };
 }
 
-/** ValidationIssue -> snake_case API response. */
-export function toIssueResponse(i: ValidationIssue): Record<string, unknown> {
+/** The fields shared by a persisted issue and a fresh issue draft. */
+export interface IssueLike {
+  ruleCode: string;
+  issueType: string;
+  severity: string;
+  field: string | null;
+  explanation: string;
+  suggestedAction: string;
+}
+
+/** Issue (persisted or draft) -> snake_case API response. */
+export function toIssueResponse(i: IssueLike): Record<string, unknown> {
   return {
     rule_code: i.ruleCode,
     issue_type: i.issueType,
@@ -96,10 +106,25 @@ export function toAuditResponse(a: AuditLog): Record<string, unknown> {
   };
 }
 
-export function toRunResponse(run: ValidationRun, issues: ValidationIssue[]): Record<string, unknown> {
+export function toRunResponse(run: ValidationRun, issues: IssueLike[]): Record<string, unknown> {
   return {
     run_id: run.id,
     ran_at: run.ranAt.toISOString(),
+    issue_count: run.issueCount,
+    issues: issues.map(toIssueResponse),
+  };
+}
+
+/** Validation result (run + derived status) -> snake_case API response. */
+export function toValidationResultResponse(
+  run: ValidationRun,
+  issues: IssueLike[],
+  status: string,
+): Record<string, unknown> {
+  return {
+    run_id: run.id,
+    ran_at: run.ranAt.toISOString(),
+    status,
     issue_count: run.issueCount,
     issues: issues.map(toIssueResponse),
   };

@@ -6,6 +6,8 @@ export default defineConfig({
     // separate forks to avoid cross-test DB interference.
     pool: 'forks',
     include: ['tests/**/*.test.ts'],
+    globalSetup: ['tests/globalSetup.ts'],
+    setupFiles: ['tests/setup.ts'],
     hookTimeout: 30_000,
   },
 });

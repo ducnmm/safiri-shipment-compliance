@@ -7,11 +7,14 @@ import {
 } from '../schemas.js';
 import {
   toIngestResponse,
+  toRunResponse,
   toShipmentDetailResponse,
   toShipmentResponse,
+  toValidationResultResponse,
 } from '../serializers.js';
 import * as documentService from '../services/documentService.js';
 import * as shipmentService from '../services/shipmentService.js';
+import * as validationService from '../services/validationService.js';
 
 interface IdParams {
   id: string;
@@ -56,4 +59,19 @@ export async function shipmentRoutes(app: FastifyInstance): Promise<void> {
     );
     return reply.status(201).send(toIngestResponse(result));
   });
+
+  // Run the validation engine and record a validation run.
+  app.post<{ Params: IdParams }>('/shipments/:id/validate', async (req) => {
+    const result = await validationService.validate(req.params.id, getActor(req));
+    return toValidationResultResponse(result.run, result.issues, result.status);
+  });
+
+  // Fetch the issues from the latest (or a specific) validation run.
+  app.get<{ Params: IdParams; Querystring: { runId?: string } }>(
+    '/shipments/:id/issues',
+    async (req) => {
+      const { run, issues } = await validationService.getIssues(req.params.id, req.query.runId);
+      return toRunResponse(run, issues);
+    },
+  );
 }
