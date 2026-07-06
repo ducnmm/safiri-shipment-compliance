@@ -24,7 +24,7 @@
                ▼                                   │
    ┌───────────────────────────┐      ┌───────────────────────────┐
    │  SQLite (Prisma)           │      │  reference/ + data/*.json  │
-   │  Shipment, Document,       │      │  ISO 3166 / 4217 / HS      │
+   │  Shipment, Document,       │      │  ISO 3166 / 4217 / HS / FX │
    │  ValidationRun/Issue,      │      └───────────────────────────┘
    │  AuditLog                  │
    └───────────────────────────┘
@@ -108,7 +108,7 @@ isolation with the same re-read-and-guard pattern.
 - **Audit durability**: the audit log is append-only; in production put it on retention/WORM storage and never expose deletes.
 - **Reference data**: scheduled sync jobs for HS/ISO/Comtrade with a cache and a fallback to the last-good snapshot; record source + fetch time per record.
 - **Report snapshots**: if a regulator needs an immutable report, persist a `ReportSnapshot` at generation time (today it is recomputed on demand).
-- **Hardening**: rate limiting, request size limits, and pagination on list endpoints.
+- **Hardening**: rate limiting, request size limits, and cursor-based pagination on list endpoints (bounded offset paging is already in place).
 
 ## Notes
 

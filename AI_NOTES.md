@@ -105,3 +105,22 @@ real bugs. Each is now fixed with a regression test:
   copy; the mismatch rule had a non-Date-aware one — a latent trap if `arrivalDate`
   were ever added to `MISMATCH_FIELDS`. Consolidated into one shared helper in
   `src/validation/util.ts`.
+
+## 7. Enhancements after review (and what I chose NOT to build)
+
+With time left, I picked the two upgrades that improve correctness without
+gilding, and consciously left the rest as documented trade-offs:
+
+- **Built — FX normalisation.** The invoice-plausibility rule was currency-naive:
+  it compared raw value-per-kg, so the same cargo priced in VND vs USD looked
+  wildly different. It now normalises to USD via a snapshot rate table before the
+  band check (regression test included). Still a snapshot, not a live feed —
+  documented as such.
+- **Built — bounded pagination.** `GET /shipments` now takes `?limit`/`?offset`
+  with an `X-Total-Count` header, instead of returning the whole table.
+- **Deliberately NOT built — CSV idempotency, live reference-data sync, statistical
+  (Comtrade) value checks, real auth.** These are real production needs, but
+  building them into a take-home is scope creep and each adds surface I'd rather
+  reason about than half-implement. They're listed with their production answers in
+  the README's *Known limitations* section. The judgment call itself — what to
+  build vs. document — is the point.

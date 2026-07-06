@@ -102,7 +102,7 @@ audit log (defaults to `system`).
 | Method & path | Purpose |
 |---|---|
 | `POST /shipments` | Create a shipment (`shipment_reference` required; other fields optional). |
-| `GET /shipments` | List shipments, newest first. |
+| `GET /shipments` | List shipments, newest first. Paginated: `?limit=` (1–100, default 50) & `?offset=`; total count in the `X-Total-Count` header. |
 | `GET /shipments/:id` | Fetch one shipment with document count + latest validation summary. |
 | `POST /shipments/:id/documents` | Ingest a mock document (`{ source?, payload }`) and map its fields. |
 | `POST /shipments/:id/validate` | Run the validation engine and record a run. |
@@ -148,17 +148,18 @@ All tunable thresholds live in [`src/config.ts`](./src/config.ts):
 |---|---|---|
 | `REVIEW_WINDOW_DAYS` | 14 | Arrival older than ~2 weeks likely means the cargo has landed and is accruing demurrage; prioritise it. |
 | `MAX_FUTURE_ARRIVAL_DAYS` | 180 | Arrival more than ~6 months out is implausible for ocean freight and almost always an OCR/data error (e.g. a year misread as 2062); flag rather than let it derive to `ready`. |
-| `SUSPICIOUS_MIN_VALUE_PER_KG` | 0.1 | Below this, declared value per kg is implausibly low (possible under-invoicing). Currency-naive (see below). |
-| `SUSPICIOUS_MAX_VALUE_PER_KG` | 10000 | Above this, value per kg is implausibly high (possible over-invoicing / data error). |
+| `SUSPICIOUS_MIN_VALUE_PER_KG` | 0.1 | Below this, **USD-normalised** value per kg is implausibly low (possible under-invoicing). |
+| `SUSPICIOUS_MAX_VALUE_PER_KG` | 10000 | Above this, USD-normalised value per kg is implausibly high (possible over-invoicing / data error). |
 | `WOOD_KEYWORDS` | wood, wooden, timber, pallet, crate | Packaging descriptions containing these are treated as wood (ISPM-15 scope). |
 | `HS_ALLOWED_LENGTHS` | 6, 8, 10 | 6 digits is the international HS length; 8/10 are national extensions. |
 | `REQUIRED_FIELDS` | 12 fields | Fields needed for a documentation-complete shipment (country/B-L have their own rules). |
 | `MISMATCH_FIELDS` | 10 fields | Fields compared between an ingested document and the shipment record. |
 
-Other documented simplifications: authentication is reduced to an `x-actor`
-header; list endpoints are unpaginated; monetary/weight values use SQLite `Float`
-(they are compared, never summed); the suspicious-invoice heuristic does not
-convert currencies.
+The suspicious-invoice check normalises the value to USD first (via the snapshot
+rates in `data/fx-usd-rates.json`) so the band is currency-agnostic; if a
+currency has no snapshot rate the plausibility check is skipped rather than
+guessed. Other trade-offs and their production answers are collected under
+[Known limitations](#known-limitations--trade-offs) below.
 
 ## Reference data
 
@@ -169,6 +170,7 @@ snapshot date, and refresh guidance:
 - `iso-3166-alpha2.json` — ISO 3166-1 alpha-2 country codes (249). Re-snapshot quarterly.
 - `iso-4217-currencies.json` — ISO 4217 currency codes (from the ICU/Intl database). Re-snapshot quarterly.
 - `hs-chapters.json` — WCO HS chapters 01–97 (77 is reserved; 98/99 are national-use and treated as invalid at the 6-digit level).
+- `fx-usd-rates.json` — approximate USD exchange-rate snapshot used to normalise invoice values before the plausibility check. **Illustrative only, not for settlement**; production would fetch daily rates with a cached fallback.
 
 This is **reference data for format/plausibility checks only — not legal,
 customs, or classification advice.**
@@ -184,9 +186,45 @@ The take-home uses mocked snapshots; a production service would integrate:
 - **ISO 3166 / ISO 4217** — country and currency codes. Validate `country_of_origin`
   and `currency`. Change rarely; refresh quarterly. Public code lists.
 - **UN Comtrade** — historical trade values by HS × reporter × partner. Would turn
-  the currency-naive value-per-kg heuristic into a statistically grounded
-  plausibility band (e.g. percentile of declared unit value for that HS/route).
-  Refresh monthly; free tier is rate-limited.
+  the fixed value-per-kg band into a statistically grounded plausibility check
+  (e.g. percentile of declared unit value for that HS/route), replacing both the
+  hard-coded band and the FX snapshot. Refresh monthly; free tier is rate-limited.
+- **FX rates** — a rates provider (commercial FX API or a central-bank reference
+  feed) to convert invoice values to a base currency. Refresh daily/intraday with
+  a cached fallback; today this is the static `fx-usd-rates.json` snapshot.
+
+## Known limitations & trade-offs
+
+Deliberately scoped for a take-home. Each is a conscious cut, not an oversight —
+listed with what a production build would do instead.
+
+- **CSV import is not idempotent.** Re-POSTing the same file (e.g. after a client
+  timeout) creates the rows again. It's partly self-limiting — a repeated
+  `shipment_reference` is surfaced by the duplicate-reference rule rather than
+  silently merged — but a production endpoint would honour an `Idempotency-Key`
+  header (store the key, return the first result on replay).
+- **Reference data is snapshotted, not live.** Country/currency/HS/FX lists are
+  static JSON. Fine for format and plausibility checks; production would sync on a
+  schedule with a cached fallback (see *Public data sources* above). The FX rates
+  in particular are illustrative and must not be used for settlement.
+- **Invoice plausibility is a fixed band, not statistical.** After USD
+  normalisation the value-per-kg is compared to a hard-coded band. It catches gross
+  outliers but not subtle mis-invoicing; UN Comtrade HS×route percentiles would be
+  the real check.
+- **AuthN/Z is reduced to an `x-actor` header.** Anyone can act as anyone. Production
+  would use authenticated sessions (JWT) and roles (admin / ops / reviewer), with
+  the audit actor derived from the session, not a header.
+- **Readiness-report reads aren't transactional.** The report is assembled from a
+  few sequential reads, so a report generated *during* a concurrent validate could
+  pair a stale status with fresh issues. Harmless for a single-reviewer demo;
+  production would read at a snapshot/repeatable-read isolation. (The validate
+  status transition itself *is* guarded inside its write transaction — see
+  ARCHITECTURE.md.)
+- **Money/weights use SQLite `Float`.** Values are compared, never summed, so
+  precision loss is immaterial here; Postgres `NUMERIC` in production.
+- **No delete / soft-delete.** Records are only created and updated (append-only
+  audit fits the compliance framing). Retention and redaction would be a production
+  concern.
 
 ## Tech stack
 
