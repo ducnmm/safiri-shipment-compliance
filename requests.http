@@ -1,0 +1,119 @@
+### Shipment Compliance Automation — example requests
+###
+### Works with the VS Code "REST Client" extension (or JetBrains HTTP client):
+### open this file and click "Send Request" above each block, top to bottom.
+### The blocks share variables, so run them in order. curl equivalents are in the README.
+
+@baseUrl = http://localhost:3000
+
+### Health check
+GET {{baseUrl}}/health
+
+### 1. Create the sample shipment (from the assignment)
+# @name create
+POST {{baseUrl}}/shipments
+Content-Type: application/json
+x-actor: ops-analyst
+
+{
+  "shipment_reference": "SAF-IMP-2026-0007",
+  "exporter": "BlueRiver Manufacturing Ltd",
+  "importer": "Eastland Retail Group",
+  "invoice_number": "INV-77821",
+  "invoice_value": 48250.0,
+  "currency": "USD",
+  "goods_description": "Industrial water pumps and spare impellers",
+  "hs_code": "8413.70",
+  "country_of_origin": "CN",
+  "gross_weight_kg": 12750,
+  "net_weight_kg": 12100,
+  "number_of_packages": 42,
+  "container_number": "MSCU1234567",
+  "bill_of_lading": "BL-SHA-7788",
+  "packaging_type": "wooden crates",
+  "ispm15_certified": null,
+  "arrival_date": "2026-06-20"
+}
+
+@shipmentId = {{create.response.body.id}}
+
+### 2. Ingest a mock document (a partner feed that disagrees on the invoice value)
+POST {{baseUrl}}/shipments/{{shipmentId}}/documents
+Content-Type: application/json
+x-actor: ops-analyst
+
+{
+  "source": "partner_feed",
+  "payload": {
+    "shipment_reference": "SAF-IMP-2026-0007",
+    "invoice_value": 50000.0,
+    "hs_code": "8413.70"
+  }
+}
+
+### 3. Run the compliance validation engine
+POST {{baseUrl}}/shipments/{{shipmentId}}/validate
+x-actor: ops-analyst
+
+### 4. Fetch the issues from the latest run
+GET {{baseUrl}}/shipments/{{shipmentId}}/issues
+
+### 5. Generate the readiness report
+GET {{baseUrl}}/shipments/{{shipmentId}}/readiness-report
+
+### 6. Read the full audit trail
+GET {{baseUrl}}/shipments/{{shipmentId}}/audit-log
+
+### 7. Attempt to approve a blocked shipment (expected: 409 INVALID_STATE)
+PATCH {{baseUrl}}/shipments/{{shipmentId}}/status
+Content-Type: application/json
+x-actor: reviewer-1
+
+{ "status": "approved" }
+
+### 8. Fetch one shipment (with document count + latest validation summary)
+GET {{baseUrl}}/shipments/{{shipmentId}}
+
+### 9. List all shipments
+GET {{baseUrl}}/shipments
+
+### --- A "clean" shipment that passes and can be approved ---
+
+### 10. Create a fully valid shipment
+# @name createClean
+POST {{baseUrl}}/shipments
+Content-Type: application/json
+x-actor: ops-analyst
+
+{
+  "shipment_reference": "SAF-IMP-2026-0009",
+  "exporter": "BlueRiver Manufacturing Ltd",
+  "importer": "Eastland Retail Group",
+  "invoice_number": "INV-77822",
+  "invoice_value": 48250.0,
+  "currency": "USD",
+  "goods_description": "Industrial water pumps and spare impellers",
+  "hs_code": "8413.70",
+  "country_of_origin": "CN",
+  "gross_weight_kg": 12750,
+  "net_weight_kg": 12100,
+  "number_of_packages": 42,
+  "container_number": "CSQU3054383",
+  "bill_of_lading": "BL-SHA-7799",
+  "packaging_type": "wooden crates",
+  "ispm15_certified": true,
+  "arrival_date": "2026-07-01"
+}
+
+@cleanId = {{createClean.response.body.id}}
+
+### 11. Validate it (expected: status "ready", 0 issues — assuming a recent arrival date)
+POST {{baseUrl}}/shipments/{{cleanId}}/validate
+x-actor: ops-analyst
+
+### 12. Approve it (expected: 200, status "approved")
+PATCH {{baseUrl}}/shipments/{{cleanId}}/status
+Content-Type: application/json
+x-actor: reviewer-1
+
+{ "status": "approved" }
