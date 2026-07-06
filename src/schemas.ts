@@ -56,6 +56,16 @@ export interface ShipmentWriteData {
   arrivalDate: Date | null;
 }
 
+/** POST /shipments/:id/documents body. `payload` is the raw (mock OCR) document object. */
+export const ingestDocumentBodySchema = z
+  .object({
+    source: z.string().min(1).optional(),
+    payload: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+
+export type IngestDocumentBody = z.infer<typeof ingestDocumentBodySchema>;
+
 /** Explicit snake_case -> camelCase mapping so the translation is easy to audit. */
 export function toShipmentWriteData(body: CreateShipmentBody): ShipmentWriteData {
   return {

@@ -37,4 +37,12 @@ red flag, so these are real.)_
   run TypeScript directly via `tsx` and make `npm run build` a type-check gate
   (`tsc --noEmit`) instead. Trade-off noted in ARCHITECTURE.md.
 
+- **Strict vs lenient document ingestion.** The first cut validated the whole
+  document payload with a strict schema and returned `400` on any type error.
+  That contradicts the product goal — the system exists to *ingest messy data
+  and surface problems*, not to reject it. I changed ingestion to be lenient:
+  each known field is coerced independently, a value that fails is skipped (and
+  reported in `skipped_fields`), unknown keys are kept in the raw payload and
+  reported in `unknown_keys`. The document is always stored verbatim.
+
 _(More entries added below as they occur during development.)_

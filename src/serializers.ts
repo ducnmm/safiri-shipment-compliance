@@ -1,4 +1,5 @@
-import type { Shipment, ValidationIssue, ValidationRun, AuditLog } from '@prisma/client';
+import type { Document, Shipment, ValidationIssue, ValidationRun, AuditLog } from '@prisma/client';
+import type { IngestResult } from './services/documentService.js';
 
 /** Format a Date as a date-only string (arrival dates are day-granular). */
 function dateOnly(d: Date | null): string | null {
@@ -49,6 +50,20 @@ export function toShipmentDetailResponse(s: Shipment, extras: ShipmentDetailExtr
           issue_count: extras.latestRun.issueCount,
         }
       : null,
+  };
+}
+
+/** Ingest result -> snake_case API response. */
+export function toIngestResponse(result: IngestResult): Record<string, unknown> {
+  const doc: Document = result.document;
+  return {
+    document_id: doc.id,
+    source: doc.source,
+    created_at: doc.createdAt.toISOString(),
+    applied_fields: result.appliedFields,
+    conflict_fields: result.conflictFields,
+    skipped_fields: result.skipped,
+    unknown_keys: result.unknownKeys,
   };
 }
 

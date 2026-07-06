@@ -1,7 +1,16 @@
 import type { FastifyInstance } from 'fastify';
 import { getActor } from '../http.js';
-import { createShipmentBodySchema, toShipmentWriteData } from '../schemas.js';
-import { toShipmentDetailResponse, toShipmentResponse } from '../serializers.js';
+import {
+  createShipmentBodySchema,
+  ingestDocumentBodySchema,
+  toShipmentWriteData,
+} from '../schemas.js';
+import {
+  toIngestResponse,
+  toShipmentDetailResponse,
+  toShipmentResponse,
+} from '../serializers.js';
+import * as documentService from '../services/documentService.js';
 import * as shipmentService from '../services/shipmentService.js';
 
 interface IdParams {
@@ -34,5 +43,17 @@ export async function shipmentRoutes(app: FastifyInstance): Promise<void> {
       documentCount: detail.documentCount,
       latestRun: detail.latestRun,
     });
+  });
+
+  // Ingest a mock document and map its fields onto the shipment.
+  app.post<{ Params: IdParams }>('/shipments/:id/documents', async (req, reply) => {
+    const body = ingestDocumentBodySchema.parse(req.body);
+    const result = await documentService.ingestDocument(
+      req.params.id,
+      body.source,
+      body.payload,
+      getActor(req),
+    );
+    return reply.status(201).send(toIngestResponse(result));
   });
 }
