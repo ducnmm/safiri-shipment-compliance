@@ -1,7 +1,10 @@
 import type { FastifyInstance } from 'fastify';
+import { parseCsv } from '../csv.js';
+import { AppError } from '../errors.js';
 import { getActor } from '../http.js';
 import {
   createShipmentBodySchema,
+  csvShipmentRowSchema,
   ingestDocumentBodySchema,
   patchStatusBodySchema,
   toShipmentWriteData,
@@ -40,6 +43,45 @@ export async function shipmentRoutes(app: FastifyInstance): Promise<void> {
   app.get('/shipments', async () => {
     const shipments = await shipmentService.listShipments();
     return shipments.map(toShipmentResponse);
+  });
+
+  // Bulk import from CSV (bonus). Send a text/csv body with a snake_case header row.
+  // Each row is imported independently; the response reports per-row success/failure.
+  app.post('/shipments/import', async (req) => {
+    const csv = typeof req.body === 'string' ? req.body : '';
+    const rows = parseCsv(csv);
+    if (rows.length === 0) {
+      throw AppError.validation('CSV body must contain a header row and at least one data row.');
+    }
+
+    const actor = getActor(req);
+    const results: Array<Record<string, unknown>> = [];
+    let created = 0;
+
+    for (let i = 0; i < rows.length; i += 1) {
+      const parsed = csvShipmentRowSchema.safeParse(rows[i]);
+      if (!parsed.success) {
+        results.push({ row: i + 1, ok: false, error: parsed.error.issues });
+        continue;
+      }
+      try {
+        const shipment = await shipmentService.createShipment(
+          toShipmentWriteData(parsed.data),
+          actor,
+        );
+        created += 1;
+        results.push({
+          row: i + 1,
+          ok: true,
+          shipment_id: shipment.id,
+          shipment_reference: shipment.reference,
+        });
+      } catch (err) {
+        results.push({ row: i + 1, ok: false, error: (err as Error).message });
+      }
+    }
+
+    return { total: rows.length, created, failed: rows.length - created, results };
   });
 
   // Fetch one shipment with document count and latest validation summary.

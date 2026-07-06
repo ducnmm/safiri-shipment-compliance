@@ -88,15 +88,29 @@ actions in the audit log (defaults to `system`).
 | `GET /shipments/:id/readiness-report` | The readiness report projection. |
 | `GET /shipments/:id/audit-log` | The full audit trail, oldest first. |
 | `PATCH /shipments/:id/status` | Record a human decision (`{ status: "approved" \| "rejected" }`). |
+| `POST /shipments/import` | **Bonus:** bulk-create from a `text/csv` body; per-row success/failure. |
 
 All errors use one envelope: `{ "error": { "code", "message", "details" } }` with
 codes `VALIDATION_ERROR` (400), `NOT_FOUND` (404), `INVALID_STATE` (409),
 `INTERNAL` (500).
 
+### Bonus: CSV bulk import
+
+```bash
+printf 'shipment_reference,exporter,invoice_value,arrival_date,ispm15_certified\n%s\n%s\n' \
+  'SAF-CSV-1,Acme,1000,2026-07-01,true' \
+  'SAF-CSV-2,Globex,2000,2026-07-02,false' \
+  | curl -s -X POST localhost:3000/shipments/import \
+      -H 'content-type: text/csv' -H 'x-actor: ops-analyst' --data-binary @-
+```
+
+Each row is imported independently; the response reports `{ total, created, failed, results[] }`
+with a per-row `ok` flag so a partially valid file still imports its good rows.
+
 ## Tests
 
 ```bash
-npm test          # unit tests (rules, engine, ISO 6346) + API tests
+npm test          # unit tests (rules, engine, ISO 6346, CSV) + API tests
 npm run build     # type-check the whole project (tsc --noEmit)
 ```
 

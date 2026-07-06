@@ -56,6 +56,45 @@ export interface ShipmentWriteData {
   arrivalDate: Date | null;
 }
 
+/** Coerce common truthy/falsy CSV spellings into a boolean. */
+const booleanFromString = z.preprocess((v) => {
+  if (typeof v !== 'string') return v;
+  const s = v.trim().toLowerCase();
+  if (['true', '1', 'yes', 'y'].includes(s)) return true;
+  if (['false', '0', 'no', 'n'].includes(s)) return false;
+  return v; // anything else -> let z.boolean() reject it
+}, z.boolean());
+
+/** Treat an empty CSV cell as "not provided". */
+const emptyToUndefined = (v: unknown): unknown =>
+  typeof v === 'string' && v.trim() === '' ? undefined : v;
+
+/**
+ * A single CSV row for bulk import. Cells arrive as strings, so numbers, the
+ * boolean, and the date are coerced, and empty cells become undefined.
+ */
+export const csvShipmentRowSchema = z.object({
+  shipment_reference: z.string().min(1, 'shipment_reference is required'),
+  exporter: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  importer: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  invoice_number: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  invoice_value: z.preprocess(emptyToUndefined, z.coerce.number().finite().optional()),
+  currency: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  goods_description: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  hs_code: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  country_of_origin: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  gross_weight_kg: z.preprocess(emptyToUndefined, z.coerce.number().finite().optional()),
+  net_weight_kg: z.preprocess(emptyToUndefined, z.coerce.number().finite().optional()),
+  number_of_packages: z.preprocess(emptyToUndefined, z.coerce.number().int().optional()),
+  container_number: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  bill_of_lading: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  packaging_type: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  ispm15_certified: z.preprocess(emptyToUndefined, booleanFromString.optional()),
+  arrival_date: z.preprocess(emptyToUndefined, z.coerce.date().optional()),
+});
+
+export type CsvShipmentRow = z.infer<typeof csvShipmentRowSchema>;
+
 /** PATCH /shipments/:id/status body — a human approve/reject decision. */
 export const patchStatusBodySchema = z
   .object({
@@ -75,8 +114,29 @@ export const ingestDocumentBodySchema = z
 
 export type IngestDocumentBody = z.infer<typeof ingestDocumentBodySchema>;
 
+/** Structural input accepted by the shipment mapper (JSON body or a CSV row). */
+export interface ShipmentBodyInput {
+  shipment_reference: string;
+  exporter?: string | null;
+  importer?: string | null;
+  invoice_number?: string | null;
+  invoice_value?: number | null;
+  currency?: string | null;
+  goods_description?: string | null;
+  hs_code?: string | null;
+  country_of_origin?: string | null;
+  gross_weight_kg?: number | null;
+  net_weight_kg?: number | null;
+  number_of_packages?: number | null;
+  container_number?: string | null;
+  bill_of_lading?: string | null;
+  packaging_type?: string | null;
+  ispm15_certified?: boolean | null;
+  arrival_date?: Date | null;
+}
+
 /** Explicit snake_case -> camelCase mapping so the translation is easy to audit. */
-export function toShipmentWriteData(body: CreateShipmentBody): ShipmentWriteData {
+export function toShipmentWriteData(body: ShipmentBodyInput): ShipmentWriteData {
   return {
     reference: body.shipment_reference,
     exporter: body.exporter ?? null,

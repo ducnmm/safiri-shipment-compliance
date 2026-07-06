@@ -19,6 +19,11 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   registerErrorHandler(app);
 
+  // Accept raw CSV bodies for the bulk-import endpoint.
+  app.addContentTypeParser('text/csv', { parseAs: 'string' }, (_req, body, done) => {
+    done(null, body);
+  });
+
   app.get('/health', async () => ({ status: 'ok' }));
 
   // Feature routes are registered in later steps.
