@@ -37,7 +37,9 @@ export interface ShipmentPage {
 export async function listShipments(opts: { limit: number; offset: number }): Promise<ShipmentPage> {
   const [shipments, total] = await Promise.all([
     prisma.shipment.findMany({
-      orderBy: { createdAt: 'desc' },
+      // `id` (cuid) is a stable, unique tiebreaker so rows created in the same
+      // millisecond get a deterministic order — otherwise paging can overlap/skip.
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: opts.limit,
       skip: opts.offset,
     }),

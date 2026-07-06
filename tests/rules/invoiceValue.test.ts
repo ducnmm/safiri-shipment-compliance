@@ -45,7 +45,17 @@ describe('invoiceValue rule', () => {
     expect(codes(100, 10000, 'JPY')).toEqual(['INVOICE_VALUE_SUSPICIOUS']);
   });
 
-  it('skips the plausibility check when the currency has no FX rate (cannot normalise)', () => {
-    expect(codes(5, 10000, 'XafNoRate')).toHaveLength(0);
+  it('trims whitespace on the currency before the FX lookup', () => {
+    // " USD " must behave exactly like "USD" (OCR often pads values).
+    expect(codes(5, 10000, ' USD ')).toEqual(['INVOICE_VALUE_SUSPICIOUS']);
+  });
+
+  it('surfaces a LOW unchecked note for a valid ISO currency with no FX rate', () => {
+    // ARS is a valid ISO 4217 code but not in the FX snapshot -> cannot normalise.
+    expect(codes(5, 10000, 'ARS')).toEqual(['INVOICE_VALUE_PLAUSIBILITY_UNCHECKED']);
+  });
+
+  it('stays quiet when the currency is not a valid ISO code (rules 1/3 own that)', () => {
+    expect(codes(5, 10000, 'US$')).toHaveLength(0);
   });
 });

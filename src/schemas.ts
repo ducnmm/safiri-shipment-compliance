@@ -107,7 +107,10 @@ export type CsvShipmentRow = z.infer<typeof csvShipmentRowSchema>;
  */
 export const listShipmentsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
-  offset: z.coerce.number().int().min(0).default(0),
+  // Upper bound guards against overflow: an unbounded huge value reaches Prisma
+  // as `skip` and throws (→ 500). Cap it so it's a clean 400 instead; deep paging
+  // should use a cursor anyway (see Known limitations).
+  offset: z.coerce.number().int().min(0).max(2_000_000_000).default(0),
 });
 
 export type ListShipmentsQuery = z.infer<typeof listShipmentsQuerySchema>;

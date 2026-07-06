@@ -156,9 +156,11 @@ All tunable thresholds live in [`src/config.ts`](./src/config.ts):
 | `MISMATCH_FIELDS` | 10 fields | Fields compared between an ingested document and the shipment record. |
 
 The suspicious-invoice check normalises the value to USD first (via the snapshot
-rates in `data/fx-usd-rates.json`) so the band is currency-agnostic; if a
-currency has no snapshot rate the plausibility check is skipped rather than
-guessed. Other trade-offs and their production answers are collected under
+rates in `data/fx-usd-rates.json`) so the band is currency-agnostic. If a valid
+currency has no snapshot rate the check can't run, so it emits a **low-severity
+"plausibility unchecked" note** (surfaced for a human, never silently skipped)
+rather than comparing raw cross-currency numbers. Other trade-offs and their
+production answers are collected under
 [Known limitations](#known-limitations--trade-offs) below.
 
 ## Reference data

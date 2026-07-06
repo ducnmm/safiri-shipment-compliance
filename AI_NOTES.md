@@ -124,3 +124,13 @@ gilding, and consciously left the rest as documented trade-offs:
   reason about than half-implement. They're listed with their production answers in
   the README's *Known limitations* section. The judgment call itself — what to
   build vs. document — is the point.
+
+I then ran an adversarial review over those two additions specifically, which
+caught four issues I'd missed — all now fixed with tests: the FX lookup didn't
+trim whitespace (`" USD "` bypassed the check while the ISO rule accepted it); a
+valid currency with no snapshot rate was skipped silently instead of surfaced
+(now a LOW note); the `?offset` param had no upper bound, so a huge value hit
+Prisma and returned a 500 instead of a 400; and `listShipments` ordered only by
+`createdAt` with no tiebreaker, making same-millisecond rows — and the pagination
+test — non-deterministic (added a stable `id` tiebreaker). Reviewing AI output
+this way is exactly the discipline this project is meant to show.

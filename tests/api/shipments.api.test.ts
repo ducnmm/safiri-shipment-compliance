@@ -84,6 +84,12 @@ describe('shipment CRUD API', () => {
     expect(res.statusCode).toBe(400);
     expect(res.json().error.code).toBe('VALIDATION_ERROR');
   });
+
+  it('rejects an absurd offset with a 400 (not a 500)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/shipments?offset=99999999999999999999' });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe('VALIDATION_ERROR');
+  });
 });
 
 describe('validation API', () => {
