@@ -5,10 +5,12 @@ import * as shipmentService from '../src/services/shipmentService.js';
 
 /**
  * Seeds the exact sample shipment from the assignment, then ingests it as a mock
- * document. Idempotent: re-running removes the previous sample first. The seeded
- * shipment intentionally still contains the sample's issues (uncertified wood
- * packaging, invalid container check digit, stale arrival date) so a reviewer
- * can immediately POST /validate and see the engine at work.
+ * document. Idempotent and self-cleaning: it resets the shipment table to just
+ * this one canonical record, so re-running (locally or on every deploy) always
+ * yields a pristine demo. The seeded shipment intentionally still contains the
+ * sample's issues (uncertified wood packaging, invalid container check digit,
+ * stale arrival date) so a reviewer can immediately POST /validate and see the
+ * engine at work — exactly three issues, status `blocked`.
  */
 const SAMPLE = {
   shipment_reference: 'SAF-IMP-2026-0007',
@@ -33,8 +35,11 @@ const SAMPLE = {
 async function main(): Promise<void> {
   const actor = 'seed-script';
 
-  // Idempotency: cascade-deletes documents, runs, issues, and audit entries.
-  await prisma.shipment.deleteMany({ where: { reference: SAMPLE.shipment_reference } });
+  // Reset to a pristine demo: cascade-deletes every shipment and its documents,
+  // runs, issues, and audit entries (onDelete: Cascade). This clears any records
+  // left behind by prior demo/testing so validating the sample always yields
+  // exactly three issues.
+  await prisma.shipment.deleteMany({});
 
   const body = createShipmentBodySchema.parse(SAMPLE);
   const shipment = await shipmentService.createShipment(toShipmentWriteData(body), actor);
