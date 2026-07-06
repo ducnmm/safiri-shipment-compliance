@@ -68,6 +68,7 @@ export async function validate(
     countries: referenceData.countries,
     currencies: referenceData.currencies,
     hsChapters: referenceData.hsChapters,
+    fxRatesUsd: referenceData.fxRatesUsd,
     duplicateReferenceCount,
     documents: documentViews,
     config,

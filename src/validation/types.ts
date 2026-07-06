@@ -29,6 +29,8 @@ export interface ValidationContext {
   countries: Set<string>;
   currencies: Set<string>;
   hsChapters: Set<string>;
+  /** currency code -> USD per unit, for normalising invoice values (snapshot rates). */
+  fxRatesUsd: Record<string, number>;
   duplicateReferenceCount: number;
   documents: DocumentView[];
   config: Config;

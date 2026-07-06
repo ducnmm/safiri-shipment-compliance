@@ -19,9 +19,10 @@ export const config = {
   MAX_FUTURE_ARRIVAL_DAYS: 180,
 
   /**
-   * Suspicious-invoice heuristic. We flag invoice values whose value-per-kg
-   * falls outside this band. This is deliberately currency-naive (see README):
-   * a production system would normalise to a base currency first.
+   * Suspicious-invoice heuristic, in USD per kg. The invoice value is normalised
+   * to USD (via the snapshot FX rates in data/fx-usd-rates.json) before it is
+   * compared to this band, so the check is currency-agnostic. The band itself is
+   * still coarse — a production build would use HS×route unit-value percentiles.
    */
   SUSPICIOUS_MIN_VALUE_PER_KG: 0.1,
   SUSPICIOUS_MAX_VALUE_PER_KG: 10_000,

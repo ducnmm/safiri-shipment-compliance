@@ -41,6 +41,7 @@ export function makeContext(overrides: Partial<ValidationContext> = {}): Validat
     countries: referenceData.countries,
     currencies: referenceData.currencies,
     hsChapters: referenceData.hsChapters,
+    fxRatesUsd: referenceData.fxRatesUsd,
     duplicateReferenceCount: 0,
     documents: [],
     config,
