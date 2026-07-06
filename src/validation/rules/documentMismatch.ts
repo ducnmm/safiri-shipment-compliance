@@ -1,5 +1,6 @@
 import type { ShipmentSnapshot } from '../../types.js';
 import type { IssueDraft, Rule, ValidationContext } from '../types.js';
+import { valuesEqual } from '../util.js';
 
 /**
  * Rule 11 — document/shipment mismatch. For each ingested document and each
@@ -38,13 +39,6 @@ export const documentMismatchRule: Rule = {
     return issues;
   },
 };
-
-function valuesEqual(a: unknown, b: unknown): boolean {
-  if (typeof a === 'number' || typeof b === 'number') {
-    return Number(a) === Number(b);
-  }
-  return String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
-}
 
 function format(value: unknown): string {
   return typeof value === 'string' ? `"${value}"` : String(value);

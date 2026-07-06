@@ -2,6 +2,7 @@ import type { Document } from '@prisma/client';
 import { prisma } from '../db.js';
 import { AppError } from '../errors.js';
 import { mapDocumentPayload } from '../mapping.js';
+import { valuesEqual } from '../validation/util.js';
 import * as audit from './auditService.js';
 
 export interface IngestResult {
@@ -99,17 +100,4 @@ export async function ingestDocument(
 
     return { document, mapped, appliedFields, conflictFields, skipped, unknownKeys };
   });
-}
-
-/** Loose equality for detecting document/shipment conflicts at ingest time. */
-function valuesEqual(a: unknown, b: unknown): boolean {
-  if (a instanceof Date || b instanceof Date) {
-    const da = a instanceof Date ? a.getTime() : new Date(String(a)).getTime();
-    const db = b instanceof Date ? b.getTime() : new Date(String(b)).getTime();
-    return da === db;
-  }
-  if (typeof a === 'number' || typeof b === 'number') {
-    return Number(a) === Number(b);
-  }
-  return String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
 }
