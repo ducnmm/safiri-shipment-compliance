@@ -1,0 +1,104 @@
+// SQLite is used for zero-setup review; the data model is portable to Postgres.
+// Notes on SQLite-specific modelling choices (see ARCHITECTURE.md for detail):
+//   - No native enums  -> status/severity are String, constrained in TS + Zod.
+//   - No native JSON    -> raw/mapped payloads and audit details are String (JSON).
+//   - No native Decimal -> monetary/weight values are Float (compared, not summed).
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+/// Canonical shipment record. Fields are nullable by design: dirty/partial data
+/// is accepted on ingest and surfaced later by the validation engine rather than
+/// rejected at the door.
+model Shipment {
+  id               String    @id @default(cuid())
+  reference        String // intentionally NOT @unique — duplicates are a validation issue, not a hard error
+  exporter         String?
+  importer         String?
+  invoiceNumber    String?
+  invoiceValue     Float?
+  currency         String?
+  goodsDescription String?
+  hsCode           String?
+  countryOfOrigin  String?
+  grossWeightKg    Float?
+  netWeightKg      Float?
+  numberOfPackages Int?
+  containerNumber  String?
+  billOfLading     String?
+  packagingType    String?
+  ispm15Certified  Boolean?
+  arrivalDate      DateTime?
+  status           String    @default("draft")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  documents      Document[]
+  validationRuns ValidationRun[]
+  auditLogs      AuditLog[]
+
+  @@index([reference])
+}
+
+/// A single ingested document payload (mock OCR / partner feed). Kept separate
+/// from Shipment so document-vs-shipment mismatches can be detected.
+model Document {
+  id           String   @id @default(cuid())
+  shipmentId   String
+  shipment     Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  source       String   @default("mock_ocr")
+  rawPayload   String // original JSON exactly as received (stringified)
+  mappedFields String // normalized subset we extracted (stringified JSON)
+  createdAt    DateTime @default(now())
+
+  @@index([shipmentId])
+}
+
+/// One execution of the validation engine. History is preserved (never
+/// overwritten) so a shipment's compliance state is auditable over time.
+model ValidationRun {
+  id         String   @id @default(cuid())
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  ranAt      DateTime @default(now())
+  issueCount Int
+
+  issues ValidationIssue[]
+
+  @@index([shipmentId])
+}
+
+/// A single issue raised by a rule during a validation run.
+model ValidationIssue {
+  id              String        @id @default(cuid())
+  runId           String
+  run             ValidationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  ruleCode        String
+  issueType       String
+  severity        String // low | medium | high | critical
+  field           String?
+  explanation     String
+  suggestedAction String
+
+  @@index([runId])
+}
+
+/// Append-only audit trail. Every state-changing action writes exactly one row
+/// through auditService.record().
+model AuditLog {
+  id         String   @id @default(cuid())
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  action     String
+  actor      String
+  details    String // JSON stringified context
+  createdAt  DateTime @default(now())
+
+  @@index([shipmentId])
+}

@@ -1,4 +1,5 @@
 import { buildApp } from './app.js';
+import { prisma } from './db.js';
 
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? '0.0.0.0';
@@ -9,6 +10,7 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string): Promise<void> => {
     app.log.info({ signal }, 'Shutting down');
     await app.close();
+    await prisma.$disconnect();
     process.exit(0);
   };
   process.on('SIGINT', () => void shutdown('SIGINT'));
@@ -18,6 +20,7 @@ async function main(): Promise<void> {
     await app.listen({ port: PORT, host: HOST });
   } catch (err) {
     app.log.error(err);
+    await prisma.$disconnect();
     process.exit(1);
   }
 }
