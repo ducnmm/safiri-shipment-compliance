@@ -6,6 +6,7 @@ import {
   createShipmentBodySchema,
   csvShipmentRowSchema,
   ingestDocumentBodySchema,
+  listShipmentsQuerySchema,
   patchStatusBodySchema,
   toShipmentWriteData,
 } from '../schemas.js';
@@ -39,9 +40,15 @@ export async function shipmentRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(201).send(toShipmentResponse(shipment));
   });
 
-  // List shipments (newest first).
-  app.get('/shipments', async () => {
-    const shipments = await shipmentService.listShipments();
+  // List shipments (newest first) with bounded pagination (?limit=&offset=).
+  // The body stays a plain array (GitHub-style); the full count and paging window
+  // are returned as headers so existing clients aren't broken.
+  app.get('/shipments', async (req, reply) => {
+    const { limit, offset } = listShipmentsQuerySchema.parse(req.query);
+    const { shipments, total } = await shipmentService.listShipments({ limit, offset });
+    reply.header('X-Total-Count', String(total));
+    reply.header('X-Limit', String(limit));
+    reply.header('X-Offset', String(offset));
     return shipments.map(toShipmentResponse);
   });
 

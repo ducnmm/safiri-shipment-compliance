@@ -100,6 +100,18 @@ export const csvShipmentRowSchema = z.object({
 
 export type CsvShipmentRow = z.infer<typeof csvShipmentRowSchema>;
 
+/**
+ * GET /shipments query params — bounded pagination. Non-strict so unrelated
+ * query params (cache-busters, etc.) don't 400. Both values are coerced from
+ * strings and defaulted, so `GET /shipments` with no params returns the newest 50.
+ */
+export const listShipmentsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type ListShipmentsQuery = z.infer<typeof listShipmentsQuerySchema>;
+
 /** PATCH /shipments/:id/status body — a human approve/reject decision. */
 export const patchStatusBodySchema = z
   .object({

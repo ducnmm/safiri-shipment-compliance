@@ -28,9 +28,22 @@ export async function getShipmentOrThrow(id: string): Promise<Shipment> {
   return shipment;
 }
 
-/** List all shipments, newest first. Pagination omitted (documented simplification). */
-export async function listShipments(): Promise<Shipment[]> {
-  return prisma.shipment.findMany({ orderBy: { createdAt: 'desc' } });
+export interface ShipmentPage {
+  shipments: Shipment[];
+  total: number;
+}
+
+/** List shipments, newest first, with bounded pagination. `total` is the full count. */
+export async function listShipments(opts: { limit: number; offset: number }): Promise<ShipmentPage> {
+  const [shipments, total] = await Promise.all([
+    prisma.shipment.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: opts.limit,
+      skip: opts.offset,
+    }),
+    prisma.shipment.count(),
+  ]);
+  return { shipments, total };
 }
 
 export interface ShipmentDetail {

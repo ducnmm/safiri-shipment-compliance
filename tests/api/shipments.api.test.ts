@@ -66,6 +66,24 @@ describe('shipment CRUD API', () => {
     const refs = res.json().map((s: { shipment_reference: string }) => s.shipment_reference);
     expect(refs).toEqual(['B', 'A']);
   });
+
+  it('paginates with ?limit & ?offset and reports the total in a header', async () => {
+    for (const ref of ['A', 'B', 'C']) {
+      await app.inject({ method: 'POST', url: '/shipments', payload: { shipment_reference: ref } });
+    }
+    const page1 = await app.inject({ method: 'GET', url: '/shipments?limit=2&offset=0' });
+    expect(page1.headers['x-total-count']).toBe('3');
+    expect(page1.json().map((s: { shipment_reference: string }) => s.shipment_reference)).toEqual(['C', 'B']);
+
+    const page2 = await app.inject({ method: 'GET', url: '/shipments?limit=2&offset=2' });
+    expect(page2.json().map((s: { shipment_reference: string }) => s.shipment_reference)).toEqual(['A']);
+  });
+
+  it('rejects an out-of-range limit with a 400 envelope', async () => {
+    const res = await app.inject({ method: 'GET', url: '/shipments?limit=0' });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe('VALIDATION_ERROR');
+  });
 });
 
 describe('validation API', () => {

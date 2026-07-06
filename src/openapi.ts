@@ -139,15 +139,28 @@ export const openapiDocument = {
       get: {
         tags: ['Shipments'],
         summary: 'List shipments (newest first)',
+        description:
+          'Bounded pagination. The body is a plain array; the total count and paging window are ' +
+          'returned in the `X-Total-Count`, `X-Limit`, and `X-Offset` response headers.',
+        parameters: [
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } },
+          { name: 'offset', in: 'query', required: false, schema: { type: 'integer', minimum: 0, default: 0 } },
+        ],
         responses: {
           200: {
-            description: 'Array of shipments',
+            description: 'Array of shipments (newest first)',
+            headers: {
+              'X-Total-Count': { schema: { type: 'integer' }, description: 'Total shipments matching (ignores paging)' },
+              'X-Limit': { schema: { type: 'integer' } },
+              'X-Offset': { schema: { type: 'integer' } },
+            },
             content: {
               'application/json': {
                 schema: { type: 'array', items: { $ref: '#/components/schemas/Shipment' } },
               },
             },
           },
+          400: errorResponse('Invalid limit/offset (envelope)'),
         },
       },
       post: {
