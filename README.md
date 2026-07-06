@@ -13,7 +13,10 @@ for how AI tooling was used.
 
 **https://safiri-api-production.up.railway.app** (Railway)
 
-A sample shipment is seeded on boot. Open the URL for an endpoint index, or:
+The easiest way to explore it is the interactive API docs at
+**[`/docs`](https://safiri-api-production.up.railway.app/docs)** — open any
+endpoint, click *Try it out*, and run it against the live instance (no curl). A
+sample shipment is seeded on boot. Or from the shell:
 
 ```bash
 BASE=https://safiri-api-production.up.railway.app
@@ -38,8 +41,9 @@ npm run seed                 # load the assignment's sample shipment
 npm run dev                  # start the API on http://localhost:3000
 ```
 
-Then, in another terminal, run the walkthrough below (or open `requests.http` in
-VS Code with the REST Client extension and send the requests top to bottom).
+Then open **http://localhost:3000/docs** for the interactive API explorer, run
+the walkthrough below, or open `requests.http` in VS Code (REST Client extension)
+and send the requests top to bottom.
 
 ## API walkthrough (curl)
 

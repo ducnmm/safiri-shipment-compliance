@@ -1,5 +1,9 @@
+import fastifySwagger from '@fastify/swagger';
+import fastifySwaggerUi from '@fastify/swagger-ui';
 import Fastify, { type FastifyInstance } from 'fastify';
+import type { OpenAPIV3 } from 'openapi-types';
 import { registerErrorHandler } from './errors.js';
+import { openapiDocument } from './openapi.js';
 
 const LANDING_HTML = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -14,8 +18,8 @@ const LANDING_HTML = `<!doctype html>
 </style></head><body>
 <h1>Shipment Compliance Automation</h1>
 <p class="sub">Backend demo — ingest shipment data, validate against compliance rules, produce a readiness report, keep an audit trail.</p>
-<p>This is a JSON API (no UI). A sample shipment is seeded on boot. Explore the GET endpoints below, or drive the full flow with <code>requests.http</code> / curl from the README.</p>
-<p><span class="tag">try</span> <a href="/shipments">/shipments</a> · <a href="/health">/health</a></p>
+<p><strong>Easiest way to test: open <a href="/docs">/docs</a></strong> — an interactive API explorer. Click any endpoint, hit <em>Try it out</em>, and run it against this live instance (no curl needed). A sample shipment is seeded on boot.</p>
+<p><span class="tag">try</span> <a href="/docs">/docs</a> · <a href="/shipments">/shipments</a> · <a href="/health">/health</a></p>
 <table><thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead><tbody>
 <tr><td>POST</td><td>/shipments</td><td>Create a shipment</td></tr>
 <tr><td>GET</td><td>/shipments</td><td>List shipments</td></tr>
@@ -52,6 +56,17 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   });
 
   registerErrorHandler(app);
+
+  // Interactive API docs at /docs. Served as a static OpenAPI document so request
+  // validation stays with Zod at the boundary (the docs never affect behaviour).
+  // The document is structurally an OpenAPI 3 spec; the plugin types it as a
+  // strict union our hand-authored literal can't be proven to match, hence one
+  // localized cast.
+  await app.register(fastifySwagger, {
+    mode: 'static',
+    specification: { document: openapiDocument as unknown as OpenAPIV3.Document },
+  });
+  await app.register(fastifySwaggerUi, { routePrefix: '/docs' });
 
   // Accept raw CSV bodies for the bulk-import endpoint.
   app.addContentTypeParser('text/csv', { parseAs: 'string' }, (_req, body, done) => {
