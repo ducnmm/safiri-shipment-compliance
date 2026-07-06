@@ -20,6 +20,14 @@ describe('arrivalWindow rule', () => {
     expect(codes('2026-06-22T00:00:00.000Z')).toHaveLength(0);
   });
 
+  it('accepts a normal near-future arrival (within the plausibility window)', () => {
+    expect(codes('2026-08-01T00:00:00.000Z')).toHaveLength(0);
+  });
+
+  it('flags an implausibly far-future arrival (OCR/data error, e.g. 2062)', () => {
+    expect(codes('2062-06-20T00:00:00.000Z')).toEqual(['ARRIVAL_DATE_IMPLAUSIBLE_FUTURE']);
+  });
+
   it('skips when arrival date is absent', () => {
     expect(arrivalWindowRule.check(makeSnapshot({ arrivalDate: null }), ctx)).toHaveLength(0);
   });

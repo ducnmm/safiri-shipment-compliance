@@ -11,6 +11,14 @@ export const config = {
   REVIEW_WINDOW_DAYS: 14,
 
   /**
+   * Arrival dates more than this many days in the FUTURE are implausible for
+   * ocean freight and almost always a data-entry / OCR error (e.g. a year read
+   * as 2062 instead of 2026). Flagged so bad dates cannot quietly derive a
+   * shipment to `ready`.
+   */
+  MAX_FUTURE_ARRIVAL_DAYS: 180,
+
+  /**
    * Suspicious-invoice heuristic. We flag invoice values whose value-per-kg
    * falls outside this band. This is deliberately currency-naive (see README):
    * a production system would normalise to a base currency first.
