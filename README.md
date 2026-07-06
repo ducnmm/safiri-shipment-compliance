@@ -9,6 +9,22 @@ Built for the Safiri AI Software Engineer take-home. See [`ARCHITECTURE.md`](./A
 for design decisions and the path to production, and [`AI_NOTES.md`](./AI_NOTES.md)
 for how AI tooling was used.
 
+## Live demo
+
+**https://safiri-api-production.up.railway.app** (Railway)
+
+A sample shipment is seeded on boot. Open the URL for an endpoint index, or:
+
+```bash
+BASE=https://safiri-api-production.up.railway.app
+SID=$(curl -s $BASE/shipments | python3 -c 'import sys,json;print(json.load(sys.stdin)[0]["id"])')
+curl -s -X POST $BASE/shipments/$SID/validate | python3 -m json.tool     # -> status "blocked", 3 issues
+curl -s $BASE/shipments/$SID/readiness-report | python3 -m json.tool
+```
+
+> It is a demo instance (SQLite on a small volume); please don't load-test it.
+> The reviewer's primary path is still cloning and running locally (below).
+
 ## Quickstart
 
 Requires Node.js 20+ (developed on Node 22). No external services — the database
