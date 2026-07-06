@@ -36,6 +36,17 @@ describe('shipment CRUD API', () => {
     expect(body.arrival_date).toBe('2026-06-20');
   });
 
+  it('accepts the assignment sample verbatim, incl. its bill_of_lading_number field name', async () => {
+    // The PDF sample names the field `bill_of_lading_number`; the canonical API
+    // field is `bill_of_lading`. It must be accepted as an alias so the sample
+    // can be pasted verbatim, and canonicalised on the way in.
+    const { bill_of_lading, ...rest } = SAMPLE_PAYLOAD;
+    const pdfVerbatim = { ...rest, bill_of_lading_number: bill_of_lading };
+    const res = await app.inject({ method: 'POST', url: '/shipments', payload: pdfVerbatim });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().bill_of_lading).toBe('BL-SHA-7788');
+  });
+
   it('rejects a missing reference with a 400 envelope', async () => {
     const res = await app.inject({ method: 'POST', url: '/shipments', payload: { exporter: 'x' } });
     expect(res.statusCode).toBe(400);

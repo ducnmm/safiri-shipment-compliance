@@ -27,6 +27,10 @@ export const createShipmentBodySchema = z
     number_of_packages: z.number().int().nullable().optional(),
     container_number: optionalString,
     bill_of_lading: optionalString,
+    // The assignment's sample payload spells this `bill_of_lading_number`; we
+    // accept it as an alias so the sample pastes verbatim, and canonicalise to
+    // `bill_of_lading` in toShipmentWriteData().
+    bill_of_lading_number: optionalString,
     packaging_type: optionalString,
     ispm15_certified: z.boolean().nullable().optional(),
     arrival_date: z.coerce.date().nullable().optional(),
@@ -88,6 +92,7 @@ export const csvShipmentRowSchema = z.object({
   number_of_packages: z.preprocess(emptyToUndefined, z.coerce.number().int().optional()),
   container_number: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
   bill_of_lading: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  bill_of_lading_number: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
   packaging_type: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
   ispm15_certified: z.preprocess(emptyToUndefined, booleanFromString.optional()),
   arrival_date: z.preprocess(emptyToUndefined, z.coerce.date().optional()),
@@ -130,6 +135,8 @@ export interface ShipmentBodyInput {
   number_of_packages?: number | null;
   container_number?: string | null;
   bill_of_lading?: string | null;
+  /** Alias for `bill_of_lading` (the assignment sample's field name). */
+  bill_of_lading_number?: string | null;
   packaging_type?: string | null;
   ispm15_certified?: boolean | null;
   arrival_date?: Date | null;
@@ -151,7 +158,7 @@ export function toShipmentWriteData(body: ShipmentBodyInput): ShipmentWriteData 
     netWeightKg: body.net_weight_kg ?? null,
     numberOfPackages: body.number_of_packages ?? null,
     containerNumber: body.container_number ?? null,
-    billOfLading: body.bill_of_lading ?? null,
+    billOfLading: body.bill_of_lading ?? body.bill_of_lading_number ?? null,
     packagingType: body.packaging_type ?? null,
     ispm15Certified: body.ispm15_certified ?? null,
     arrivalDate: body.arrival_date ?? null,

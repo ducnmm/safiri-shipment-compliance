@@ -24,6 +24,8 @@ const FIELD_DEFS = [
   { snake: 'number_of_packages', camel: 'numberOfPackages', schema: z.number().int() },
   { snake: 'container_number', camel: 'containerNumber', schema: z.string().min(1) },
   { snake: 'bill_of_lading', camel: 'billOfLading', schema: z.string().min(1) },
+  // Alias: the assignment sample names this `bill_of_lading_number`.
+  { snake: 'bill_of_lading_number', camel: 'billOfLading', schema: z.string().min(1) },
   { snake: 'packaging_type', camel: 'packagingType', schema: z.string().min(1) },
   { snake: 'ispm15_certified', camel: 'ispm15Certified', schema: z.boolean() },
   { snake: 'arrival_date', camel: 'arrivalDate', schema: z.coerce.date() },
