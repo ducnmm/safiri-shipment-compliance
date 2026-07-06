@@ -89,6 +89,15 @@ draft ──(ingest)──▶ documents_ingested ──(validate)──▶ block
 Re-validation is allowed from any non-terminal status. `blocked` has no manual
 override — the underlying data must be fixed and the shipment re-validated.
 
+**Concurrency:** the rule engine runs against a snapshot read outside the write
+transaction (rules are read-only, so a slightly stale snapshot is acceptable),
+but the status transition is guarded *inside* the transaction: `validate`
+re-reads the current status and re-checks the terminal guard before updating, so
+a validate racing a `PATCH` approve/reject can never clobber a terminal decision,
+and the audit `from` always reflects the real prior status. On SQLite the write
+transaction serialises; on Postgres this would use the default read-committed
+isolation with the same re-read-and-guard pattern.
+
 ## Path to production
 
 - **Database**: Postgres with `NUMERIC` for money/weights; keep the Prisma schema, change the datasource.

@@ -43,10 +43,11 @@ export async function validate(
     throw AppError.notFound(`Shipment ${shipmentId} not found`);
   }
 
-  const previousStatus = shipment.status as ShipmentStatus;
-  if (isTerminal(previousStatus)) {
+  // Fast-fail on a stale read; the authoritative terminal guard runs inside the
+  // transaction below (this read can be stale under a concurrent PATCH).
+  if (isTerminal(shipment.status as ShipmentStatus)) {
     throw AppError.invalidState(
-      `Shipment is ${previousStatus} (terminal) and cannot be re-validated.`,
+      `Shipment is ${shipment.status} (terminal) and cannot be re-validated.`,
     );
   }
 
@@ -73,9 +74,30 @@ export async function validate(
   });
 
   const newStatus = deriveStatus(issues);
-  const statusChanged = newStatus !== previousStatus;
 
-  const run = await prisma.$transaction(async (tx) => {
+  const committed = await prisma.$transaction(async (tx) => {
+    // Re-read the status inside the transaction. The read at the top of this
+    // function (used to build the snapshot) can be stale: a concurrent PATCH
+    // could have moved the shipment to a terminal state between then and now.
+    // Guarding + deriving the audit `from` here — not from the stale read —
+    // stops a validate from clobbering an approved/rejected decision and keeps
+    // the audit trail honest. This runs inside the write transaction, so the
+    // check and the update commit atomically.
+    const current = await tx.shipment.findUnique({
+      where: { id: shipmentId },
+      select: { status: true },
+    });
+    if (!current) {
+      throw AppError.notFound(`Shipment ${shipmentId} not found`);
+    }
+    const currentStatus = current.status as ShipmentStatus;
+    if (isTerminal(currentStatus)) {
+      throw AppError.invalidState(
+        `Shipment is ${currentStatus} (terminal) and cannot be re-validated.`,
+      );
+    }
+    const statusChanged = newStatus !== currentStatus;
+
     const createdRun = await tx.validationRun.create({
       data: { shipmentId, issueCount: issues.length },
     });
@@ -97,16 +119,22 @@ export async function validate(
 
     if (statusChanged) {
       await audit.record(tx, shipmentId, 'shipment.status_changed', actor, {
-        from: previousStatus,
+        from: currentStatus,
         to: newStatus,
         trigger: 'validation',
       });
     }
 
-    return createdRun;
+    return { run: createdRun, previousStatus: currentStatus, statusChanged };
   });
 
-  return { run, issues, status: newStatus, previousStatus, statusChanged };
+  return {
+    run: committed.run,
+    issues,
+    status: newStatus,
+    previousStatus: committed.previousStatus,
+    statusChanged: committed.statusChanged,
+  };
 }
 
 export interface IssuesView {

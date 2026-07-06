@@ -100,6 +100,39 @@ describe('end-to-end sample workflow', () => {
     expect(res.json().error.code).toBe('INVALID_STATE');
   });
 
+  it('refuses to re-validate a terminal (approved) shipment and records no new run', async () => {
+    const create = await app.inject({
+      method: 'POST',
+      url: '/shipments',
+      payload: {
+        ...SAMPLE_PAYLOAD,
+        shipment_reference: 'SAF-IMP-2026-0009',
+        container_number: 'CSQU3054383',
+        ispm15_certified: true,
+        arrival_date: '2026-07-01',
+      },
+    });
+    const id = create.json().id as string;
+
+    await app.inject({ method: 'POST', url: `/shipments/${id}/validate` }); // -> ready
+    await app.inject({
+      method: 'PATCH',
+      url: `/shipments/${id}/status`,
+      payload: { status: 'approved' },
+    }); // -> approved (terminal)
+
+    const revalidate = await app.inject({ method: 'POST', url: `/shipments/${id}/validate` });
+    expect(revalidate.statusCode).toBe(409);
+    expect(revalidate.json().error.code).toBe('INVALID_STATE');
+
+    // The terminal guard aborts the whole transaction: exactly one run persisted.
+    const runCount = await prisma.validationRun.count({ where: { shipmentId: id } });
+    expect(runCount).toBe(1);
+    // Status is untouched by the rejected re-validation.
+    const shipment = await app.inject({ method: 'GET', url: `/shipments/${id}` });
+    expect(shipment.json().status).toBe('approved');
+  });
+
   it('validates a corrected shipment to ready and approves it, with a full audit trail', async () => {
     const create = await app.inject({
       method: 'POST',
