@@ -51,7 +51,7 @@ SID=$(curl -s -X POST localhost:3000/shipments -H 'content-type: application/jso
     "importer":"Eastland Retail Group","invoice_number":"INV-77821","invoice_value":48250.0,
     "currency":"USD","goods_description":"Industrial water pumps","hs_code":"8413.70",
     "country_of_origin":"CN","gross_weight_kg":12750,"net_weight_kg":12100,
-    "number_of_packages":42,"container_number":"MSCU1234567","bill_of_lading":"BL-SHA-7788",
+    "number_of_packages":42,"container_number":"MSCU1234567","bill_of_lading_number":"BL-SHA-7788",
     "packaging_type":"wooden crates","ispm15_certified":null,"arrival_date":"2026-06-20"
   }' | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
 
@@ -90,8 +90,10 @@ and an invalid container check digit (high). The readiness report looks like:
 ## API reference
 
 The public API speaks **snake_case** JSON (matching the assignment's sample), so
-the sample payload can be pasted verbatim. The optional `x-actor` header attributes
-actions in the audit log (defaults to `system`).
+the sample payload can be pasted verbatim — including its `bill_of_lading_number`
+field, which is accepted as an alias for the canonical `bill_of_lading` and
+normalised on input. The optional `x-actor` header attributes actions in the
+audit log (defaults to `system`).
 
 | Method & path | Purpose |
 |---|---|
@@ -141,6 +143,7 @@ All tunable thresholds live in [`src/config.ts`](./src/config.ts):
 | Constant | Value | Rationale |
 |---|---|---|
 | `REVIEW_WINDOW_DAYS` | 14 | Arrival older than ~2 weeks likely means the cargo has landed and is accruing demurrage; prioritise it. |
+| `MAX_FUTURE_ARRIVAL_DAYS` | 180 | Arrival more than ~6 months out is implausible for ocean freight and almost always an OCR/data error (e.g. a year misread as 2062); flag rather than let it derive to `ready`. |
 | `SUSPICIOUS_MIN_VALUE_PER_KG` | 0.1 | Below this, declared value per kg is implausibly low (possible under-invoicing). Currency-naive (see below). |
 | `SUSPICIOUS_MAX_VALUE_PER_KG` | 10000 | Above this, value per kg is implausibly high (possible over-invoicing / data error). |
 | `WOOD_KEYWORDS` | wood, wooden, timber, pallet, crate | Packaging descriptions containing these are treated as wood (ISPM-15 scope). |

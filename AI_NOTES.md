@@ -1,14 +1,22 @@
 # AI Usage Notes
 
-The assignment explicitly asks how AI tooling was used. This file is kept up to
-date **during** development, not written afterwards.
+The assignment explicitly asks how AI tooling was used, so this is an honest
+account of the workflow and where my judgement overrode the AI's.
+
+**Workflow, plainly:** most of the thinking went into a detailed implementation
+plan written up front (design, data model, the eleven rules, the ISO 6346
+algorithm, the trade-offs in §4). Executing that plan with Claude Code was then a
+single focused session — the git history is a tight ~1.5-hour run of small,
+per-step commits, not a week of organic development. The design disagreements in
+§4 happened while writing and reviewing the plan; I'm recording them here rather
+than pretending they were narrated commit-by-commit. After the first pass I did a
+review sweep that caught four real defects — those fixes are in §6.
 
 ## 1. Tools used
 
 - **Claude Code** (Anthropic) — used as a pair-programmer for scaffolding,
-  writing rule boilerplate and their unit tests, and drafting documentation.
-  A detailed implementation plan was written first (by me, with AI help) and
-  then executed step by step, committing after each step.
+  writing rule boilerplate and their unit tests, and drafting documentation,
+  against a plan I wrote first and then executed step by step.
 
 ## 2. What was AI-assisted
 
@@ -28,8 +36,8 @@ date **during** development, not written afterwards.
 
 ## 4. Disagreements and corrections
 
-_(Captured as they happen — the assignment treats blindly-trusted output as a
-red flag, so these are real.)_
+_(Real design decisions from the planning and review stages, each verifiable in
+the code — the assignment treats blindly-trusted output as a red flag.)_
 
 - **Build pipeline.** The initial suggestion was a full `tsc` emit-to-`dist`
   build. For an ESM + Node project that forces `.js` extensions on every
@@ -73,3 +81,27 @@ red flag, so these are real.)_
 - **Least trustworthy**: anything numeric or product-shaped — the check-digit
   maths, the status-derivation policy, and the ingestion semantics all needed a
   human decision or verification. Those are the parts I own in an interview.
+
+## 6. Review pass — defects I found and fixed after the first cut
+
+A deliberate second read (the kind of thing AI output most needs) surfaced four
+real bugs. Each is now fixed with a regression test:
+
+- **`bill_of_lading_number` was rejected.** The assignment's sample names the
+  field `bill_of_lading_number`, but my create schema used `bill_of_lading` with
+  `.strict()`, so pasting the sample verbatim 400'd — while the README claimed it
+  wouldn't. Fixed by accepting the sample's name as an alias (create schema, CSV
+  import, and the document mapper) and canonicalising to `bill_of_lading`. Test:
+  `tests/api/shipments.api.test.ts` posts the PDF sample verbatim.
+- **ISO 6346 check digit resolving to 10.** My original `(sum mod 11) mod 10`
+  folded a remainder of 10 down to 0, which wrongly validates a serial ending in
+  0 whose true remainder is 10 (e.g. `MSCU0000060`). ISO 6346 does not assign
+  those, so they're now rejected. Test vector added in `tests/iso6346.test.ts`.
+- **Far-future arrival dates passed silently.** The arrival rule only checked the
+  past-facing window, so an OCR typo like `2062-06-20` cleared every rule and
+  could derive a shipment to `ready`. Added a `MAX_FUTURE_ARRIVAL_DAYS`
+  (medium-severity) guard.
+- **Two divergent `valuesEqual` helpers.** Document ingestion had a Date-aware
+  copy; the mismatch rule had a non-Date-aware one — a latent trap if `arrivalDate`
+  were ever added to `MISMATCH_FIELDS`. Consolidated into one shared helper in
+  `src/validation/util.ts`.
