@@ -53,4 +53,23 @@ red flag, so these are real.)_
   *invalid*, which the validation engine correctly reports. Both are locked in
   as unit-test vectors so a future refactor can't silently break the maths.
 
-_(More entries added below as they occur during development.)_
+- **Rejected a unique constraint on `shipment_reference`.** The obvious modelling
+  instinct is to make the reference unique. I deliberately did not: this is a
+  triage system for dirty data, so a duplicate reference must be *surfaced as a
+  validation issue* (rule 10) for a human to resolve, not rejected by the
+  database. The trade-off and the alternative (409 at creation) are in
+  ARCHITECTURE.md.
+
+- **Corrected assumptions about SQLite + Prisma.** Generated schema drafts reached
+  for `enum`, `Json`, and `Decimal` column types. Prisma does not support these on
+  SQLite, so status/severity are `String` (constrained by TS unions + Zod), JSON
+  payloads are stringified, and money/weights are `Float` (compared, never summed).
+  This was anticipated in the plan and confirmed against Prisma's docs.
+
+## 5. Where AI helped most vs. least
+
+- **Most useful**: mechanical breadth — 11 rule files + tests, serializers, the
+  snake/camel mapping table. Fast and easy to review because each piece is small.
+- **Least trustworthy**: anything numeric or product-shaped — the check-digit
+  maths, the status-derivation policy, and the ingestion semantics all needed a
+  human decision or verification. Those are the parts I own in an interview.
