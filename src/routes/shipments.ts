@@ -3,9 +3,11 @@ import { getActor } from '../http.js';
 import {
   createShipmentBodySchema,
   ingestDocumentBodySchema,
+  patchStatusBodySchema,
   toShipmentWriteData,
 } from '../schemas.js';
 import {
+  toAuditResponse,
   toIngestResponse,
   toRunResponse,
   toShipmentDetailResponse,
@@ -13,6 +15,7 @@ import {
   toValidationResultResponse,
 } from '../serializers.js';
 import * as documentService from '../services/documentService.js';
+import * as reportService from '../services/reportService.js';
 import * as shipmentService from '../services/shipmentService.js';
 import * as validationService from '../services/validationService.js';
 
@@ -74,4 +77,22 @@ export async function shipmentRoutes(app: FastifyInstance): Promise<void> {
       return toRunResponse(run, issues);
     },
   );
+
+  // Generate the readiness report from the latest validation run.
+  app.get<{ Params: IdParams }>('/shipments/:id/readiness-report', async (req) => {
+    return reportService.generateReport(req.params.id, getActor(req));
+  });
+
+  // Record a human approve/reject decision.
+  app.patch<{ Params: IdParams }>('/shipments/:id/status', async (req) => {
+    const body = patchStatusBodySchema.parse(req.body);
+    const shipment = await shipmentService.changeStatus(req.params.id, body.status, getActor(req));
+    return toShipmentResponse(shipment);
+  });
+
+  // Fetch the full audit trail (oldest first).
+  app.get<{ Params: IdParams }>('/shipments/:id/audit-log', async (req) => {
+    const entries = await shipmentService.getAuditLog(req.params.id);
+    return entries.map(toAuditResponse);
+  });
 }

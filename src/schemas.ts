@@ -56,6 +56,15 @@ export interface ShipmentWriteData {
   arrivalDate: Date | null;
 }
 
+/** PATCH /shipments/:id/status body — a human approve/reject decision. */
+export const patchStatusBodySchema = z
+  .object({
+    status: z.enum(['approved', 'rejected']),
+  })
+  .strict();
+
+export type PatchStatusBody = z.infer<typeof patchStatusBodySchema>;
+
 /** POST /shipments/:id/documents body. `payload` is the raw (mock OCR) document object. */
 export const ingestDocumentBodySchema = z
   .object({

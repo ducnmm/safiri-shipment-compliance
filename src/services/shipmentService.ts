@@ -1,7 +1,9 @@
-import type { Shipment, ValidationRun } from '@prisma/client';
+import type { AuditLog, Shipment, ValidationRun } from '@prisma/client';
 import { prisma } from '../db.js';
 import { AppError } from '../errors.js';
 import type { ShipmentWriteData } from '../schemas.js';
+import { canManuallyTransition } from '../statusMachine.js';
+import type { ShipmentStatus } from '../types.js';
 import * as audit from './auditService.js';
 
 /** Create a shipment and record the creation event in the same transaction. */
@@ -48,4 +50,43 @@ export async function getShipmentDetail(id: string): Promise<ShipmentDetail> {
     }),
   ]);
   return { shipment, documentCount, latestRun };
+}
+
+/**
+ * Record a human decision (approve/reject). Only allowed from ready or
+ * requires_review; any other transition is a 409 (enforced by the status machine).
+ */
+export async function changeStatus(
+  shipmentId: string,
+  target: ShipmentStatus,
+  actor: string,
+): Promise<Shipment> {
+  const shipment = await getShipmentOrThrow(shipmentId);
+  const from = shipment.status as ShipmentStatus;
+  if (!canManuallyTransition(from, target)) {
+    throw AppError.invalidState(
+      `Cannot change status from "${from}" to "${target}". A manual decision is only allowed from "ready" or "requires_review" to "approved" or "rejected".`,
+    );
+  }
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.shipment.update({
+      where: { id: shipmentId },
+      data: { status: target },
+    });
+    await audit.record(tx, shipmentId, 'shipment.status_changed', actor, {
+      from,
+      to: target,
+      trigger: 'manual_decision',
+    });
+    return updated;
+  });
+}
+
+/** Fetch the full audit trail for a shipment, oldest first. */
+export async function getAuditLog(shipmentId: string): Promise<AuditLog[]> {
+  await getShipmentOrThrow(shipmentId);
+  return prisma.auditLog.findMany({
+    where: { shipmentId },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
 }
