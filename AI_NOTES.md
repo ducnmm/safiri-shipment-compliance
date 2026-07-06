@@ -45,4 +45,12 @@ red flag, so these are real.)_
   reported in `skipped_fields`), unknown keys are kept in the raw payload and
   reported in `unknown_keys`. The document is always stored verbatim.
 
+- **Verified the check-digit algorithm rather than trusting it.** AI-generated
+  ISO 6346 code is easy to get subtly wrong (the letter-value table skips
+  multiples of 11). I hand-computed the check digit for the published example
+  `CSQU3054383` (→ 3, valid) and for the assignment's own sample container
+  `MSCU1234567` (→ 6, but the number claims 7). The sample number is therefore
+  *invalid*, which the validation engine correctly reports. Both are locked in
+  as unit-test vectors so a future refactor can't silently break the maths.
+
 _(More entries added below as they occur during development.)_
